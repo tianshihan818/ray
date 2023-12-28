@@ -78,9 +78,12 @@ PLACEMENT_GROUP_WILDCARD_RESOURCE_PATTERN = re.compile(r"(.+)_group_([0-9a-zA-Z]
 
 
 def get_user_temp_dir():
+    print('[get_user_temp_dir] the parent dir is ', flush=True)
     if "RAY_TMPDIR" in os.environ:
+        print('[get_user_temp_dir] set by env var RAY_TMPDIR: ', os.environ["RAY_TMPDIR"], flush=True)
         return os.environ["RAY_TMPDIR"]
     elif sys.platform.startswith("linux") and "TMPDIR" in os.environ:
+        print('[get_user_temp_dir] set by env var TMPDIR: ', os.environ["TMPDIR"], flush=True)
         return os.environ["TMPDIR"]
     elif sys.platform.startswith("darwin") or sys.platform.startswith("linux"):
         # Ideally we wouldn't need this fallback, but keep it for now for
@@ -88,25 +91,36 @@ def get_user_temp_dir():
         tempdir = os.path.join(os.sep, "tmp")
     else:
         tempdir = tempfile.gettempdir()
+    print('[get_user_temp_dir] not from env var, automatically: ', tempdir, flush=True)
     return tempdir
 
 
 def get_ray_temp_dir():
+    print('[get_ray_temp_dir] get_ray_temp_dir() calls get_user_temp_dir() to get temp_dir parent dir.', flush=True)
     return os.path.join(get_user_temp_dir(), "ray")
 
 
 def get_ray_address_file(temp_dir: Optional[str]):
+    print('[get_ray_address_file] input temp_dir: ', temp_dir, flush=True)
     if temp_dir is None:
+        print('[get_ray_address_file] input temp_dir = None, set it by get_ray_temp_dir().', flush=True)
         temp_dir = get_ray_temp_dir()
+        print('[get_ray_address_file] returns temp_dir is: ', temp_dir, flush=True)
     return os.path.join(temp_dir, "ray_current_cluster")
 
 
 def write_ray_address(ray_address: str, temp_dir: Optional[str] = None):
+    # import pdb; pdb.set_trace()
+    print('[write_ray_address] call get_ray_address_file(temp_dir) to get address_file path.', flush=True)
     address_file = get_ray_address_file(temp_dir)
+    print('[write_ray_address] returns ray address file path is: ', address_file, flush=True)
     if os.path.exists(address_file):
+        print('[write_ray_address] if the address file exists', flush=True)
+        print('[write_ray_address] read the prev address from it: ', flush=True)
         with open(address_file, "r") as f:
             prev_address = f.read()
         if prev_address == ray_address:
+            print('[write_ray_address] if prev_address == current_ray_address, then return, will not trigger Permission Denied ERROR', flush=True)
             return
 
         logger.info(
@@ -116,6 +130,11 @@ def write_ray_address(ray_address: str, temp_dir: Optional[str] = None):
             f"address={prev_address} to ray.init()."
         )
 
+    print('[write_ray_address] update ray address in address_file: ', address_file, flush=True)
+    ll_cmd = f'ls -l {address_file}'
+    print('[write_ray_address] check the permission info of this address_file: ', flush=True)
+    print('[write_ray_address] ', subprocess.run(ll_cmd, shell=True), flush=True)
+    print('[write_ray_address] check whoami: ', subprocess.run('whoami'), flush=True)
     with open(address_file, "w+") as f:
         f.write(ray_address)
 
@@ -130,7 +149,9 @@ def reset_ray_address(temp_dir: Optional[str] = None):
 
 
 def read_ray_address(temp_dir: Optional[str] = None) -> str:
+    print('[read_ray_address] input temp_dir: ', temp_dir, flush=True)
     address_file = get_ray_address_file(temp_dir)
+    print('[read_ray_address] get address_file path: ', address_file, flush=True)
     if not os.path.exists(address_file):
         return None
     with open(address_file, "r") as f:

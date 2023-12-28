@@ -592,6 +592,11 @@ def start(
 ):
     """Start Ray processes manually on the local machine."""
 
+    node_type = 'head' if head else 'worker'
+    print(f'Start {node_type} node ...', flush=True)
+    print('CLI args --temp-dir: ', temp_dir, flush=True)
+    print('env var RAY_TMPDIR: ', os.environ.get("RAY_TMPDIR"), flush=True)
+
     if gcs_server_port is not None:
         cli_logger.error(
             "`{}` is deprecated and ignored. Use {} to specify "
@@ -623,13 +628,16 @@ def start(
             stacklevel=2,
         )
     if temp_dir and not head:
+        print('--temp-dir is given without setting --head, var temp_dir will be set None.', flush=True)
         cli_logger.warning(
             f"`--temp-dir={temp_dir}` option will be ignored. "
             "`--head` is a required flag to use `--temp-dir`. "
             "temp_dir is only configurable from a head node. "
             "All the worker nodes will use the same temp_dir as a head node. "
         )
+        print('\tbefore: ', temp_dir, flush=True)
         temp_dir = None
+        print('\tafter: ', temp_dir, flush=True)
 
     redirect_output = None if not no_redirect_output else True
 
@@ -641,6 +649,7 @@ def start(
     if has_ray_client and ray_client_server_port is None:
         ray_client_server_port = 10001
 
+    print('[ray_params] input temp_dir when init ray_params: ', temp_dir, flush=True)
     ray_params = ray._private.parameter.RayParams(
         node_ip_address=node_ip_address,
         node_name=node_name if node_name else node_ip_address,
@@ -679,9 +688,12 @@ def start(
         tracing_startup_hook=tracing_startup_hook,
         ray_debugger_external=ray_debugger_external,
     )
+    print('[ray_params] check ray_params.temp_dir: ', ray_params.temp_dir, flush=True)
 
     if ray_constants.RAY_START_HOOK in os.environ:
         _load_class(os.environ[ray_constants.RAY_START_HOOK])(ray_params, head)
+    
+    print('[RAY_START_HOOK] check env var RAY_START_HOOK: ', os.environ.get("RAY_START_HOOK"), flush=True)
 
     if head:
         # Start head node.
@@ -754,7 +766,11 @@ def start(
         # Fail early when starting a new cluster when one is already running
         if address is None:
             default_address = f"{ray_params.node_ip_address}:{port}"
+
+            print('[find_bootstrap_address] input temp_dir: ', temp_dir, flush=True)
             bootstrap_address = services.find_bootstrap_address(temp_dir)
+            print('[find_bootstrap_address] not return back temp_dir, check temp_dir now: ', temp_dir, flush=True)
+            
             if (
                 default_address == bootstrap_address
                 and bootstrap_address in services.find_gcs_addresses()
@@ -768,9 +784,15 @@ def start(
                     " flag of `ray start` command."
                 )
 
+        print('[ray._private.node.Node] input temp_dir is ray_params.temp_dir: ', ray_params.temp_dir, flush=True)
+        print('[ray._private.node.Node] check var temp_dir now: ', temp_dir, flush=True)
         node = ray._private.node.Node(
             ray_params, head=True, shutdown_at_exit=block, spawn_reaper=block
         )
+        print('[ray._private.node.Node] return head node instance.', flush=True)
+        print('[ray._private.node.Node] check node._temp_dir: ', node._temp_dir, flush=True)
+        print('[ray._private.node.Node] check node._ray_params.temp_dir: ', node._ray_params.temp_dir, flush=True)
+        print('[ray._private.node.Node] check var temp_dir now: ', temp_dir, flush=True)
 
         bootstrap_address = node.address
 
@@ -904,9 +926,11 @@ def start(
             )
 
         # Start Ray on a non-head node.
+        print('[canonicalize_bootstrap_address] input temp_dir: ', temp_dir, flush=True)
         bootstrap_address = services.canonicalize_bootstrap_address(
             address, temp_dir=temp_dir
         )
+        print('[canonicalize_bootstrap_address] not return back temp_dir, check temp_dir now: ', temp_dir, flush=True)
 
         if bootstrap_address is None:
             cli_logger.abort(
@@ -925,10 +949,18 @@ def start(
 
         cli_logger.labeled_value("Local node IP", ray_params.node_ip_address)
 
+        print('[ray._private.node.Node] input temp_dir is ray_params.temp_dir: ', ray_params.temp_dir, flush=True)
+        print('[ray._private.node.Node] check var temp_dir now: ', temp_dir, flush=True)
         node = ray._private.node.Node(
             ray_params, head=False, shutdown_at_exit=block, spawn_reaper=block
         )
+        print('[ray._private.node.Node] return worker node instance.', flush=True)
+        print('[ray._private.node.Node] check node._temp_dir: ', node._temp_dir, flush=True)
+        print('[ray._private.node.Node] check node._ray_params.temp_dir: ', node._ray_params.temp_dir, flush=True)
+        print('[ray._private.node.Node] check var temp_dir now: ', temp_dir, flush=True)
+
         temp_dir = node.get_temp_dir_path()
+        print('[v2.8.1] set var temp_dir = node._temp_dir, check var temp_dir now: ', temp_dir, flush=True)
 
         # Ray and Python versions should probably be checked before
         # initializing Node.
@@ -945,6 +977,9 @@ def start(
         cli_logger.flush()
 
     assert ray_params.gcs_address is not None
+
+    print('[ray._private.utils.write_ray_address] update ray address in address file.', flush=True)
+    print('[ray._private.utils.write_ray_address] input temp_dir is the var temp_dir: ', temp_dir, flush=True)
     ray._private.utils.write_ray_address(ray_params.gcs_address, temp_dir)
 
     if block:

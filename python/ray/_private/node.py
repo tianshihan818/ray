@@ -107,6 +107,10 @@ class Node:
                 "System config parameters can only be set on the head node."
             )
 
+        print('[ray._private.node.Node.__init__] <1> call ray_params.update_if_absent.', flush=True)
+        print('\t[v2.8.1] do nothing on ray_params.temp_dir, will not change ray_params.temp_dir.', flush=True)
+        print('\tcheck ...', flush=True)
+        print('\tray_params.temp_dir before: ', ray_params.temp_dir, flush=True)
         ray_params.update_if_absent(
             include_log_monitor=True,
             resources={},
@@ -121,9 +125,11 @@ class Node:
                 ray_constants.SETUP_WORKER_FILENAME,
             ),
         )
+        print('\tray_params.temp_dir after: ', ray_params.temp_dir, flush=True)
 
         self._resource_spec = None
         self._localhost = socket.gethostbyname("localhost")
+        print('[ray._private.node.Node.__init__] <2> set self._ray_params = ray_params', flush=True)
         self._ray_params = ray_params
         self._config = ray_params._system_config or {}
 
@@ -191,6 +197,7 @@ class Node:
                 )
 
         # It creates a session_dir.
+        print('[ray._private.node.Node.__init__] <3> call self._init_temp()', flush=True)
         self._init_temp()
 
         node_ip_address = ray_params.node_ip_address
@@ -409,21 +416,36 @@ class Node:
         self._incremental_dict = collections.defaultdict(lambda: 0)
 
         if self.head:
+            print('[ray._private.node.Node._init_temp] <4> if head', flush=True)
+            print('\t[v2.8.1] first call self._ray_params.update_if_absent', flush=True)
+            print('\t[v2.8.1] if self._ray_params.temp_dir is None, will call ray._private.utils.get_ray_temp_dir() to set it.', flush=True)
+            print('\tcheck ...', flush=True)
+            print('\tself._ray_params.temp_dir before: ', self._ray_params.temp_dir, flush=True)
             self._ray_params.update_if_absent(
                 temp_dir=ray._private.utils.get_ray_temp_dir()
             )
+            print('\tself._ray_params.temp_dir after: ', self._ray_params.temp_dir, flush=True)
             self._temp_dir = self._ray_params.temp_dir
+            print('\tthen set self._temp_dir = self._ray_params.temp_dir: ', self._temp_dir, flush=True)
         else:
+            print('[ray._private.node.Node._init_temp] <4> if worker', flush=True)
             if self._ray_params.temp_dir is None:
                 assert not self._default_worker
+                print('\t[v2.8.1] if self._ray_params.temp_dir is None, worker will get the `temp_dir` by key from head gcs.', flush=True)
+                print('\t[v2.8.1] call ray._private.utils.internal_kv_get_with_retry', flush=True)
+                print('\t[v2.8.1] temp dir before: ', self._ray_params.temp_dir, flush=True)
+                print(f'\t[v2.8.1] curl ray head gcs server {self._gcs_address} ... ', subprocess.run(f'curl {self._gcs_address}', shell=True), flush=True)
                 temp_dir = ray._private.utils.internal_kv_get_with_retry(
                     self.get_gcs_client(),
                     "temp_dir",
                     ray_constants.KV_NAMESPACE_SESSION,
                     num_retries=ray_constants.NUM_REDIS_GET_RETRIES,
                 )
+                print('\t[v2.8.1] get `temp_dir` from head gcs: ', temp_dir, flush=True)
                 self._temp_dir = ray._private.utils.decode(temp_dir)
+                print('\t[v2.8.1] set it into self._temp_dir after decoding: ', self._temp_dir, flush=True)
             else:
+                print('\t[v2.8.1] if self._ray_params.temp_dir is not None, set self._temp_dir = self._ray_params.temp_dir.', flush=True)
                 self._temp_dir = self._ray_params.temp_dir
 
         try_to_create_directory(self._temp_dir)
