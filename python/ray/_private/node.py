@@ -132,6 +132,11 @@ class Node:
 
         self._raylet_ip_address = raylet_ip_address
 
+        print('[ray._private.node.Node.__init__] <1> call ray_params.update_if_absent.', flush=True)
+        print('\t[v2.3.1] if ray_params.temp_dir is None, will call ray._private.utils.get_ray_temp_dir() to set ray_params.temp_dir.', flush=True)
+        print('\tif env var RAY_TMPDIR or TMPDIR not set, ray._private.utils.get_ray_temp_dir() will return `tmp` in linux.', flush=True)
+        print('\tcheck ...', flush=True)
+        print('\tray_params.temp_dir before: ', ray_params.temp_dir, flush=True)
         ray_params.update_if_absent(
             include_log_monitor=True,
             resources={},
@@ -147,9 +152,11 @@ class Node:
                 ray_constants.SETUP_WORKER_FILENAME,
             ),
         )
+        print('\tray_params.temp_dir after: ', ray_params.temp_dir, flush=True)
 
         self._resource_spec = None
         self._localhost = socket.gethostbyname("localhost")
+        print('[ray._private.node.Node.__init__] <2> set self._ray_params = ray_params', flush=True)
         self._ray_params = ray_params
         self._config = ray_params._system_config or {}
 
@@ -211,6 +218,7 @@ class Node:
                     f"{ray_params.dashboard_host}:{ray_params.dashboard_port}"
                 )
 
+        print('[ray._private.node.Node.__init__] <3> call self._init_temp()', flush=True)
         self._init_temp()
 
         # Validate and initialize the persistent storage API.
@@ -366,8 +374,14 @@ class Node:
         self._incremental_dict = collections.defaultdict(lambda: 0)
 
         if self.head:
+            print('[ray._private.node.Node._init_temp] <4> if head', flush=True)
+            print('\t[v2.3.1] directly set self._temp_dir = self._ray_params.temp_dir', flush=True)
             self._temp_dir = self._ray_params.temp_dir
         else:
+            print('[ray._private.node.Node._init_temp] <4> if worker', flush=True)
+            print('\t[v2.3.1] in __init__, if ray_params.temp_dir is None, ray_params.update_if_absent will set a value.', flush=True)
+            print('\t[v2.3.1] so self._ray_params.temp_dir is not None forever.', flush=True)
+            print('\t[v2.3.1] then worker will not get the `temp_dir` by key from head gcs.', flush=True)
             if self._ray_params.temp_dir is None:
                 assert not self._default_worker
                 temp_dir = ray._private.utils.internal_kv_get_with_retry(
@@ -378,6 +392,9 @@ class Node:
                 )
                 self._temp_dir = ray._private.utils.decode(temp_dir)
             else:
+                print('\t[v2.3.1] finally, worker will set self._temp_dir = self._ray_params.temp_dir', flush=True)
+                print('\t[v2.3.1] that means, if env var RAY_TMPDIR not set before, worker will get `/tmp` as its temp dir', flush=True)
+                print('\t[v2.3.1] check self._temp_dir: ', self._temp_dir, flush=True)
                 self._temp_dir = self._ray_params.temp_dir
 
         try_to_create_directory(self._temp_dir)

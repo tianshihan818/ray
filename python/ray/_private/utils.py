@@ -89,17 +89,25 @@ def get_ray_temp_dir():
 
 
 def get_ray_address_file(temp_dir: Optional[str]):
+    print('[get_ray_address_file] input temp_dir: ', temp_dir, flush=True)
     if temp_dir is None:
+        print('[get_ray_address_file] input temp_dir = None, set it by get_ray_temp_dir().', flush=True)
         temp_dir = get_ray_temp_dir()
+        print('[get_ray_address_file] returns temp_dir is: ', temp_dir, flush=True)
     return os.path.join(temp_dir, "ray_current_cluster")
 
 
 def write_ray_address(ray_address: str, temp_dir: Optional[str] = None):
+    print('[write_ray_address] call get_ray_address_file(temp_dir) to get address_file path.', flush=True)
     address_file = get_ray_address_file(temp_dir)
+    print('[write_ray_address] returns ray address file path is: ', address_file, flush=True)
     if os.path.exists(address_file):
+        print('[write_ray_address] if the address file exists', flush=True)
+        print('[write_ray_address] read the prev address from it: ', flush=True)
         with open(address_file, "r") as f:
             prev_address = f.read()
         if prev_address == ray_address:
+            print('[write_ray_address] if prev_address == current_ray_address, then return, will not trigger Permission Denied ERROR', flush=True)
             return
 
         logger.info(
@@ -108,7 +116,12 @@ def write_ray_address(ray_address: str, temp_dir: Optional[str] = None):
             f"instance at {ray_address}. To override this behavior, pass "
             f"address={prev_address} to ray.init()."
         )
-
+    print('[write_ray_address] if the address file not exists, it will be created when open with `w+`, will not trigger Permission Denied ERROR', flush=True)
+    print('[write_ray_address] or, if the address file exists and the prev_address != current_ray_address, then write the current_ray_address to this file, ', flush=True)
+    print('[write_ray_address] when the user do not have write permission on this file, will trigger Permission Denied ERROR', flush=True)
+    print('[write_ray_address] check the permission of this address_file: ', flush=True)
+    print('[write_ray_address] ', subprocess.run(f'ls -l {address_file}', shell=True), flush=True)
+    print('[write_ray_address] check whoami: ', subprocess.run('whoami'), flush=True)
     with open(address_file, "w+") as f:
         f.write(ray_address)
 
